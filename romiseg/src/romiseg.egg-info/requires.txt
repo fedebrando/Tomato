@@ -1,0 +1,13 @@
+appdirs
+future
+Pillow
+requests
+torch<2
+torchvision
+tqdm
+plantdb.commons
+
+[train]
+labelme
+pyqt5==5.14
+tensorboard
