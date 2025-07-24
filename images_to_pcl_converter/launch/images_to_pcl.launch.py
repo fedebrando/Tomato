@@ -6,8 +6,8 @@ def generate_launch_description():
     params = {
         "ref_link": "camera_color_optical_frame",
         "camera_info_topic": "/camera/camera/color/camera_info",
-        "pcl_topic": "converted_pcl",
-        "rgb_topic": "/camera/camera/color/image_raw",
+        "pcl_topic": "rgb_pointcloud",
+        "rgb_topic": "/camera/camera/color/image_rect_raw",
         "depth_topic": "/camera/camera/aligned_depth_to_color/image_raw",
     }
 

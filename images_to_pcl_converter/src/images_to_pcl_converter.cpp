@@ -17,7 +17,7 @@ using std::placeholders::_2;
 
 // Constants for image saving
 const int SAVE_FREQUENCY = 30; // Save one image every 30 frames
-const std::string SAVE_DIRECTORY = "/tmp/saved_images";
+const std::string SAVE_DIRECTORY = "/home/federico/robotica_ws/src/federico.brandini/Tomato/images";
 
 class SynchronizedImageSubscriberNode : public rclcpp::Node
 {
@@ -25,10 +25,10 @@ public:
     SynchronizedImageSubscriberNode() : Node("images_to_pcl_converter_node")
     {
         ref_link_ = this->declare_parameter<std::string>("ref_link", "");
-        std::string rgb_topic = this->declare_parameter<std::string> ("rgb_topic", "/camera/camera/color/image_rect_raw");
-        std::string depth_topic = this->declare_parameter<std::string>("depth_topic", "/camera/camera/aligned_depth_to_color/image_raw");
-        std::string camera_info_topic = this->declare_parameter<std::string>("camera_info_topic", "/camera/camera/color/camera_info");
-        std::string pcl_topic = this->declare_parameter<std::string>("pcl_topic", "rgb_pointcloud");
+        std::string rgb_topic = this->declare_parameter<std::string> ("rgb_topic", "");
+        std::string depth_topic = this->declare_parameter<std::string>("depth_topic", "");
+        std::string camera_info_topic = this->declare_parameter<std::string>("camera_info_topic", "");
+        std::string pcl_topic = this->declare_parameter<std::string>("pcl_topic", "");
 
 
         // Create the save directory if it does not exist
@@ -60,7 +60,6 @@ public:
 private:
     void imageCallback(const sensor_msgs::msg::Image::SharedPtr rgb_msg, const sensor_msgs::msg::Image::SharedPtr depth_msg)
     {
-        RCLCPP_INFO(this->get_logger(), "AAA");
         if (!camera_info_available or !publish_pcl)
             return;
 
@@ -68,8 +67,6 @@ private:
         // Access RGB image data using rgb_msg->data, rgb_msg->width, rgb_msg->height, etc.
         // Access depth image data using depth_msg->data, depth_msg->width, depth_msg->height, etc.
         // Access camera parameters using camera_info->D, camera_info->K, camera_info->P, etc.
-
-        RCLCPP_INFO(this->get_logger(), "BBB");
 
         // Generate RGB point cloud using PCL
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr point_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
