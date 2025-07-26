@@ -119,7 +119,7 @@ for child in  a[0].children():
         param.requires_grad = False
 '''
 
-voxels = torch.load(coord_file_loc + '/voxels.pt').to(device)
+voxels = torch.load(coord_file_loc + '/voxels.pt', map_location=torch.device(device)).to(device)
 
 model = segmentation_model.ResNetUNet_3D(num_classes, coord_file_loc).to(device)
 
@@ -153,7 +153,7 @@ if True:
     torch.save(model, directory_weights + '/' + new_model_name)
     model = model[0]
 else:
-    model = torch.load(directory_weights + '/' + new_model_name)[0].to(device)
+    model = torch.load(directory_weights + '/' + new_model_name, map_location=torch.device(device))[0].to(device)
 
 dataloaders = {
     'train': DataLoader(train_dataset, batch_size=batch_size, shuffle=False, num_workers=0),
@@ -183,7 +183,7 @@ torch.save(model, directory_weights + '/' + model_segmentation_name)
 cnn_train(directory_weights, directory_dataset, label_names, tsboard, batch_size, epochs,
                     model_segmentation_name, Sx, Sy)
 '''
-model = torch.load(directory_weights + '/' + model_segmentation_name)[0].to(device)
+model = torch.load(directory_weights + '/' + model_segmentation_name, map_location=torch.device(device))[0].to(device)
 accuracy = []
 
 for image, label, voxel in dataloaders['train']:

@@ -93,7 +93,7 @@ def save_and_load_model(weights_folder, model_segmentation_name):
 
         download_file(url, weights_folder)
 
-    model_segmentation = torch.load(weights_folder + '/' + model_segmentation_name)[0]
+    model_segmentation = torch.load(weights_folder + '/' + model_segmentation_name, map_location=torch.device(device))[0]
 
     try:
         model_segmentation = model_segmentation.module
@@ -357,7 +357,7 @@ class Dataset_im_label_3D(Dataset):
         background = background.unsqueeze(0)
         torch_labels = torch.cat((background, torch_labels), dim=0)
 
-        voxel = io.read_torch(self.voxel_path[index])
+        voxel = io.read_torch(self.voxel_path[index], map_location=torch.device(device))
 
         return t_image, torch_labels, voxel
 

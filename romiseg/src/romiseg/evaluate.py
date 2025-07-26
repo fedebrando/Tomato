@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = torch.load(directory_weights + '/' + model_segmentation_name)
+    model = torch.load(directory_weights + '/' + model_segmentation_name, map_location=torch.device(device))
     """
     train_bce = model[1]['bce'][::2]
     val_bce = model[1]['bce'][1::2]

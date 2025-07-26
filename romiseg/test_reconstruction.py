@@ -83,8 +83,9 @@ pred_tot = torch.Tensor(pred_tot)
 pred_tot = pred_tot.permute(0, 2, 3, 1) // 255
 preds_flat = vtc.adjust_predictions(pred_tot)
 
-xy_full_flat = torch.load(coord_file_loc + '/coords.pt')
-voxels = torch.load(coord_file_loc + '/voxels.pt')
+device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+xy_full_flat = torch.load(coord_file_loc + '/coords.pt', map_location=torch.device(device))
+voxels = torch.load(coord_file_loc + '/voxels.pt', map_location=torch.device(device))
 
 assign_preds = preds_flat[xy_full_flat].reshape(pred_tot.shape[0],
                                                 xy_full_flat.shape[0] // pred_tot.shape[0], preds_flat.shape[-1])

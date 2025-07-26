@@ -63,7 +63,7 @@ def save_and_load_model(weights_folder, model_segmentation_name):
 
         download_file(url, weights_folder)
 
-    model_segmentation = torch.load(weights_folder + '/' + model_segmentation_name)
+    model_segmentation = torch.load(weights_folder + '/' + model_segmentation_name, map_location=torch.device(device))
     try:
         model_segmentation = model_segmentation[0]
     except:
@@ -92,7 +92,7 @@ def model_from_fileset(model_file):
     numpy.ndarray
         A sorted array of label names associated with the model.
     """
-    model_segmentation = io.read_torch(model_file)
+    model_segmentation = io.read_torch(model_file, map_location=torch.device(device))
     try:
         model_segmentation = model_segmentation[0]
     except:

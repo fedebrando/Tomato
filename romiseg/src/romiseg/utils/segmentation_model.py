@@ -475,7 +475,7 @@ class ResNetUNet_3D(nn.Module):
         # print(x.shape)
         x = self.conv_last(x)
 
-        xy_full_flat = torch.load(self.coord_file_loc + '/coords.pt').to(device)
+        xy_full_flat = torch.load(self.coord_file_loc + '/coords.pt', map_location=torch.device(device)).to(device)
 
         # haut = torch.empty(N_red, label_num, (xinit-Sx)//2, yinit, requires_grad = True).to(device)
         # bas = torch.empty(N_red, label_num, (xinit-Sx)//2, yinit, requires_grad = True).to(device)

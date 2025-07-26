@@ -195,7 +195,9 @@ def generate_ground_truth(directory_dataset, pcd_loc, coord_file_loc,
         [w, h, l] = num_vox
         voxels = pcd
         voxels[:, :3] = (voxels[:, :3] - min_vox) // cloud_scale
-        torch_voxels = torch.load(coord_file_loc + '/voxels.pt')
+
+        device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        torch_voxels = torch.load(coord_file_loc + '/voxels.pt', map_location=torch.device(device))
 
         voxels = voxels[voxels[:, 0] > 0]
         voxels = voxels[voxels[:, 1] > 0]
