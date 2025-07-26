@@ -427,28 +427,50 @@ def file_segmentation(Sx, Sy, image_path, model_segmentation, label_names, devic
 
 
 def main():
+    # List of image names (without extension) you want to run inference on
+    image_names = [f'frame_{n}' for n in range(180, 601, 30)]  # Add more as needed
+
     db = test_database(with_models=True)
     db.connect()
-    scan = db.get_scan("real_plant_analyzed")
-    image_fs = scan.get_fileset('images')
-    images_path = [image.path() for image in image_fs.get_files(query={"channel": "rgb"})]
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    # Load the segmentation model
     model_file = db.get_scan('models').get_fileset('models').get_file('Resnet_896_896_epoch50')
-    print(model_file.metadata)
-    {'label_names': ['background', 'flower', 'fruit', 'leaf', 'pedicel', 'stem'], 'model_id': 'Resnet_896_896_epoch50'}
+    print(model_file.metadata)  # Optional: print metadata for debugging
     model_segmentation, label_names = model_from_fileset(model_file)
     model_segmentation = model_segmentation.to(device)
-    pred_pad = file_segmentation(896, 896, '/home/federico/robotica_ws/src/federico.brandini/Tomato/images/frame_30.ppm', model_segmentation, label_names, device)
-    # Export one predicted label in the given image for visualization
 
-    for label_idx in range(6):
-        im = pred_pad[label_idx, :, :].cpu().numpy()
-        im = im > 0.01  # threshold the segmentation mask
-        im = binary_dilation(im, footprint=disk(1))  # dilate the segmentation mask
-        im = (im * 255).astype(np.uint8)  # convert the segmentation mask to an image
-        im = 255 - im if label_names[label_idx] == 'background' else im  # invert the background color
-        img = Image.fromarray(im)  # create a PIL image from the segmentation mask
-        img.save(f'predicted_{label_names[label_idx]}.png')  # save the segmentation mask as an image
+    # Create output main directory if it doesn't exist
+    output_main_dir = 'outputs'
+    if not os.path.exists(output_main_dir):
+        os.mkdir(output_main_dir)
+
+    for image_name in image_names:
+        # Full path to the input image
+        image_path = f'/home/federico/robotica_ws/src/federico.brandini/Tomato/images/{image_name}.ppm'
+        output_dir = f'{output_main_dir}/{image_name}'  # Output folder named after the image
+
+        # Run segmentation inference
+        pred_pad = file_segmentation(896, 896, image_path, model_segmentation, label_names, device)
+
+        # Create output directory if it doesn't exist
+        if not os.path.exists(output_dir):
+            os.mkdir(output_dir)
+
+        # Save original input image
+        input_image = Image.open(image_path)
+        input_image.save(f'{output_dir}/input.png')
+
+        # Save predicted segmentation masks for each class
+        for label_idx in range(len(label_names)):
+            im = pred_pad[label_idx, :, :].cpu().numpy()
+            im = im > 0.01  # Threshold the segmentation mask
+            im = binary_dilation(im, footprint=disk(1))  # Dilate the mask
+            im = (im * 255).astype(np.uint8)  # Convert to 8-bit image
+            if label_names[label_idx] == 'background':
+                im = 255 - im  # Invert background mask for visibility
+            img = Image.fromarray(im)
+            img.save(f'{output_dir}/predicted_{label_names[label_idx]}.png')  # Save each class mask
 
     db.disconnect()
     print('Ok')
