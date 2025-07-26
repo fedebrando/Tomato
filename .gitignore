@@ -2,3 +2,4 @@
 .vscode
 build
 images
+__pycache__
