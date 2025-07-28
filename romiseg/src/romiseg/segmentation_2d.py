@@ -428,7 +428,9 @@ def file_segmentation(Sx, Sy, image_path, model_segmentation, label_names, devic
 
 def main():
     # List of image names (without extension) you want to run inference on
-    image_names = [f'frame_{n}' for n in range(180, 601, 30)]  # Add more as needed
+    #image_names = [f'frame_{n}' for n in range(180, 601, 30)]  # Add more as needed
+    #image_names = ['romiseg_image']
+    image_names = ['test00']
 
     db = test_database(with_models=True)
     db.connect()
@@ -447,7 +449,7 @@ def main():
 
     for image_name in image_names:
         # Full path to the input image
-        image_path = f'/home/federico/robotica_ws/src/federico.brandini/Tomato/images/{image_name}.ppm'
+        image_path = f'/home/federico/robotica_ws/src/federico.brandini/Tomato/images/{image_name}.jpg'
         output_dir = f'{output_main_dir}/{image_name}'  # Output folder named after the image
 
         # Run segmentation inference
