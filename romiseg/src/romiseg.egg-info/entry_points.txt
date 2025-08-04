@@ -1,3 +1,0 @@
-[console_scripts]
-finetune = romiseg.finetune:main
-train_cnn = romiseg.train_cnn:main
