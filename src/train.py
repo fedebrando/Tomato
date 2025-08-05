@@ -1,87 +1,98 @@
-
 import os
+import time
 import torch
 from torch import nn
-import time
-from model import UNET
-from torch.utils.data import DataLoader
-from dataset import TomatoDataset
+from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
+from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm  # ✅ IMPORTATO
 
-def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, epochs=1):
+from model import UNET
+from dataset import TomatoDataset
+
+TRAIN_PCT = 0.7
+VALID_PCT = 0.15
+TEST_PCT = 0.15
+
+def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, epochs=1, early_stopping_patience=200):
     start = time.time()
     model.cuda()
 
     train_loss, valid_loss = [], []
+    best_val_acc = 0.0
+    epochs_no_improve = 0
 
-    best_acc = 0.0
+    MODEL_DIR = '../models'
+    os.makedirs(MODEL_DIR, exist_ok=True)
 
     for epoch in range(epochs):
         print('Epoch {}/{}'.format(epoch, epochs - 1))
         print('-' * 10)
 
         for phase in ['train', 'valid']:
-            if phase == 'train':
-                model.train(True)  # Set trainind mode = true
-                dataloader = train_dl
-            else:
-                model.train(False)  # Set model to evaluate mode
-                dataloader = valid_dl
+            model.train(phase == 'train')
+            dataloader = train_dl if phase == 'train' else valid_dl
 
             running_loss = 0.0
             running_acc = 0.0
 
-            step = 0
-
-            # iterate over data
-            for x, y in dataloader:
+            # ✅ Aggiunta di tqdm
+            for step, (x, y) in enumerate(tqdm(dataloader, desc=f"{phase.capitalize()} Epoch {epoch}")):
                 x = x.cuda()
                 y = y.cuda()
-                step += 1
 
-                # forward pass
                 if phase == 'train':
-                    # zero the gradients
                     optimizer.zero_grad()
                     outputs = model(x)
                     loss = loss_fn(outputs, y)
-
-                    # the backward pass frees the graph memory, so there is no 
-                    # need for torch.no_grad in this training pass
                     loss.backward()
                     optimizer.step()
-                    # scheduler.step()
-
                 else:
                     with torch.no_grad():
                         outputs = model(x)
                         loss = loss_fn(outputs, y.long())
 
-                # stats - whatever is the phase
                 acc = acc_fn(outputs, y)
+                running_loss += loss.item()
+                running_acc += acc.item()
 
-                running_acc  += acc*dataloader.batch_size
-                running_loss += loss*dataloader.batch_size 
+            epoch_loss = running_loss / len(dataloader)
+            epoch_acc = running_acc / len(dataloader)
 
-                if step % 10 == 0:
-                    # clear_output(wait=True)
-                    print('Current step: {}  Loss: {}  Acc: {}  AllocMem (Mb): {}'.format(step, loss, acc, torch.cuda.memory_allocated()/1024/1024))
-                    # print(torch.cuda.memory_summary())
+            print(f"{phase.capitalize()} Loss: {epoch_loss:.4f} | Acc: {epoch_acc:.4f}")
 
-            epoch_loss = running_loss / len(dataloader.dataset)
-            epoch_acc = running_acc / len(dataloader.dataset)
+            writer.add_scalar(f'{phase}/loss', epoch_loss, epoch)
+            writer.add_scalar(f'{phase}/accuracy', epoch_acc, epoch)
 
-            print('{} Loss: {:.4f} Acc: {}'.format(phase, epoch_loss, epoch_acc))
+            if phase == 'train':
+                train_loss.append(epoch_loss)
+            else:
+                valid_loss.append(epoch_loss)
 
-            train_loss.append(epoch_loss) if phase=='train' else valid_loss.append(epoch_loss)
+                if epoch_acc > best_val_acc:
+                    best_val_acc = epoch_acc
+                    epochs_no_improve = 0
+                    print(f"✅ Saving BEST model at epoch {epoch} with val_acc: {epoch_acc:.4f}")
+                    torch.save(model.state_dict(), os.path.join(MODEL_DIR, 'best_model.pth'))
+                else:
+                    epochs_no_improve += 1
+                    print(f"⚠️ No improvement in validation accuracy for {epochs_no_improve} epoch(s)")
+
+        if epochs_no_improve > early_stopping_patience:
+            print(f"⏹️ Early stopping triggered after {epoch + 1} epochs (no improvement in {early_stopping_patience} epochs).")
+            break
+
+    print("💾 Saving LAST model after final epoch")
+    torch.save(model.state_dict(), os.path.join(MODEL_DIR, 'last_model.pth'))
 
     time_elapsed = time.time() - start
-    print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))    
-    
-    return train_loss, valid_loss    
+    print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+
+    return train_loss, valid_loss
+
 
 def acc_metric(predb, yb):
-    return (predb.argmax(dim=1) == yb.cuda()).float().mean()
+    return (predb.argmax(dim=1) == yb).float().mean()
 
 
 def main():
@@ -93,9 +104,25 @@ def main():
         transforms.ToTensor()
     ])
 
-    dataset = TomatoDataset(os.path.join('..', 'images'), transform=transform, target_transform=transform)
-    train_loader = DataLoader(dataset, 1)
-    train_loss, valid_loss = train(unet, train_loader, train_loader, loss, opt, acc_metric, epochs=10)
+    full_dataset = TomatoDataset(os.path.join('..', 'images'), transform=transform, target_transform=transform)
+
+    total_len = len(full_dataset)
+    train_len = int(total_len * TRAIN_PCT)
+    val_len = int(total_len * VALID_PCT)
+    test_len = total_len - train_len - val_len
+
+    train_dataset, val_dataset, test_dataset = random_split(full_dataset, [train_len, val_len, test_len])
+
+    train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=4, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=4, shuffle=False)
+
+    writer = SummaryWriter(log_dir='../runs/tomato_segmentation_experiment')
+
+    train_loss, valid_loss = train(unet, train_loader, val_loader, loss, opt, acc_metric, writer, epochs=100)
+
+    writer.close()
+
 
 if __name__ == '__main__':
     main()
