@@ -5,7 +5,9 @@ from torch import nn
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm  # ✅ IMPORTATO
+from tqdm import tqdm
+
+from metrics import acc_metric
 
 from model import UNET
 from dataset import TomatoDataset
@@ -89,10 +91,6 @@ def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, epochs=
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
 
     return train_loss, valid_loss
-
-
-def acc_metric(predb, yb):
-    return (predb.argmax(dim=1) == yb).float().mean()
 
 
 def main():

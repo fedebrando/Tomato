@@ -4,6 +4,8 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
+from params import COLOR_TO_CLASS
+
 class TomatoDataset(Dataset):
     def __init__(self, root_dir, transform=None, target_transform=None):
         self.root_dir = root_dir
@@ -28,15 +30,6 @@ class TomatoDataset(Dataset):
                     if os.path.exists(label_path):
                         self.samples.append((image_path, label_path))
 
-        # Mappa colori → classi
-        self.color_to_class = {
-            (255, 0, 0): 1,       # red (tomato)
-            (0, 255, 0): 2,       # green (leaf)
-            (0, 0, 255): 3,       # blue (vase)
-            (125, 125, 0): 4,     # (floor)
-            (255, 255, 0): 5      # (trunk)
-        }
-
     def __len__(self):
         return len(self.samples)
 
@@ -57,7 +50,7 @@ class TomatoDataset(Dataset):
         label_np = label_np.view(label_img.size[1], label_img.size[0], 3)  # H, W, C
         class_mask = torch.zeros((label_img.size[1], label_img.size[0]), dtype=torch.long)
 
-        for color, class_id in self.color_to_class.items():
+        for color, class_id in COLOR_TO_CLASS.items():
             match = (label_np == torch.tensor(color, dtype=torch.uint8)).all(dim=-1)
             class_mask[match] = class_id
 
