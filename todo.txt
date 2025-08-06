@@ -1,6 +1,7 @@
 
-1. Rendere tutto deterministico (seed)
+[1. Rendere tutto deterministico (seed)]
 
 4. Metriche per la segmentazione (file .py con metriche e basta)
 
 5. Aggiungere i parametri settati su tensorboard (sarebbe carino un file .py a parte con i parametri e main)
+

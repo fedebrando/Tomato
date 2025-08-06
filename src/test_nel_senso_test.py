@@ -1,35 +1,40 @@
-
-from dataset import *
-import matplotlib.pyplot as plt
+import os
+import torch
 from torchvision import transforms
-from torchvision.transforms import functional as F
+from dataset import TomatoDataset
+from collections import Counter
 
-transform = transforms.Compose([
-    transforms.ToTensor()
-])
+def test_dataset_loading():
+    root_dir = '../images'
+    seed = 42
+    test_pct = 0.15
 
-dataset = TomatoDataset('../images', transform=transform, target_transform=transform)
+    transform = transforms.ToTensor()
 
-image, label = dataset[0]
-print(image.shape, label.shape)
+    # Load datasets with same seed and transform
+    train_dataset = TomatoDataset(root_dir=root_dir, mode='train', transform=transform, seed=seed, test_pct=test_pct)
+    test_dataset = TomatoDataset(root_dir=root_dir, mode='test', transform=transform, seed=seed, test_pct=test_pct)
 
-# Convertili per la visualizzazione (da tensor a numpy)
-image_np = image.permute(1, 2, 0).numpy()  # [C,H,W] → [H,W,C]
-label_np = label.numpy()         # Rimuove il canale per grayscale o maschera
+    # === Basic checks ===
+    print(f"Train samples: {len(train_dataset)}")
+    print(f"Test samples: {len(test_dataset)}")
+    assert len(train_dataset) + len(test_dataset) > 0, "Dataset is empty!"
+    assert len(set(train_dataset.samples).intersection(set(test_dataset.samples))) == 0, "Train and test sets overlap!"
 
-# Visualizza immagine e ground truth
-plt.figure(figsize=(10, 5))
+    # === Check sample loading ===
+    img, label = train_dataset[0]
+    assert isinstance(img, torch.Tensor), "Image not converted to tensor"
+    assert isinstance(label, torch.Tensor), "Label not a tensor"
+    assert img.shape[0] == 3, "Image should have 3 channels"
+    assert label.ndim == 2, "Label should be 2D (H, W)"
+    assert img.shape[1:] == label.shape, f"Image and label size mismatch: {img.shape[1:]} vs {label.shape}"
 
-plt.subplot(1, 2, 1)
-plt.title('Input Image')
-plt.imshow(image.permute(1, 2, 0))  # [C,H,W] → [H,W,C]
-plt.axis('off')
+    # === Check class values are in expected range ===
+    unique_classes = torch.unique(label).tolist()
+    print(f"Unique class values in one label: {unique_classes}")
+    assert all(0 <= int(c) <= 5 for c in unique_classes), "Unexpected class value in label"
 
-plt.subplot(1, 2, 2)
-plt.title('Ground Truth (Class Map)')
-plt.imshow(label, cmap='gray', vmin=0, vmax=5)
-plt.axis('off')
+    print("✅ Dataset loading test passed.")
 
-plt.tight_layout()
-plt.show()
-
+if __name__ == "__main__":
+    test_dataset_loading()

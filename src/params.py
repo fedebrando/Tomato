@@ -1,4 +1,7 @@
 
+VAL_PCT = 0.15
+TEST_PCT = 0.15
+
 # Mapping from RGB colors to class IDs
 COLOR_TO_CLASS = {
     (255, 0, 0): 1,       # red (tomato)

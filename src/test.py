@@ -99,15 +99,9 @@ def main():
 
     # === DATASET ===
     transform = transforms.Compose([transforms.ToTensor()])
-    dataset = TomatoDataset(data_root, transform=transform, target_transform=None)
+    test_set = TomatoDataset(data_root, transform=transform, target_transform=None, mode='test')
 
-    total_len = len(dataset)
-    train_len = int(total_len * 0.7)
-    val_len = int(total_len * 0.15)
-    test_len = total_len - train_len - val_len
-
-    _, _, test_dataset = torch.utils.data.random_split(dataset, [train_len, val_len, test_len])
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 
     # === EVALUATION ===
     total_acc = 0.0
@@ -127,7 +121,7 @@ def main():
         model.cpu()
         print("📸 Saving visual samples...")
         for i in range(5):
-            x, y = test_dataset[i]
+            x, y = test_set[i]
             pred = model(x.unsqueeze(0)).squeeze(0)
             pred_mask = pred.argmax(dim=0).byte()
             plot_sample_grid(x, pred_mask, y, idx=i)

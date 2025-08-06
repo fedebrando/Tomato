@@ -8,13 +8,9 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from metrics import acc_metric
-
 from model import UNET
 from dataset import TomatoDataset
-
-TRAIN_PCT = 0.7
-VALID_PCT = 0.15
-TEST_PCT = 0.15
+from params import VAL_PCT
 
 def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, epochs=1, early_stopping_patience=200):
     start = time.time()
@@ -92,7 +88,6 @@ def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, epochs=
 
     return train_loss, valid_loss
 
-
 def main():
     unet = UNET(3, 6)
     loss = nn.CrossEntropyLoss()
@@ -102,18 +97,16 @@ def main():
         transforms.ToTensor()
     ])
 
-    full_dataset = TomatoDataset(os.path.join('..', 'images'), transform=transform, target_transform=transform)
+    train_data = TomatoDataset(os.path.join('..', 'images'), transform=transform, target_transform=transform, mode='train')
+    train_data_len = len(train_data)
 
-    total_len = len(full_dataset)
-    train_len = int(total_len * TRAIN_PCT)
-    val_len = int(total_len * VALID_PCT)
-    test_len = total_len - train_len - val_len
+    val_len = int(train_data_len * VAL_PCT)
+    train_len = train_data_len - val_len
 
-    train_dataset, val_dataset, test_dataset = random_split(full_dataset, [train_len, val_len, test_len])
+    train_dataset, val_dataset = random_split(train_data, [train_len, val_len])
 
     train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=4, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=4, shuffle=False)
 
     writer = SummaryWriter(log_dir='../runs/tomato_segmentation_experiment')
 
