@@ -112,7 +112,7 @@ def main(args):
 
     model_name = f"{args.opt}_lr{args.lr:.0e}_bs{args.bs}_es{args.early_stop}"
 
-    writer = SummaryWriter(log_dir='../runs/' + model_name)
+    writer = SummaryWriter(log_dir='../runs/' + model_name + "/train/")
 
     train_loss, valid_loss = train(unet, train_loader, val_loader, loss, opt, acc_metric, writer, args, model_name, epochs=args.epochs)
 

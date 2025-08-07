@@ -18,6 +18,6 @@ def get_train_args():
 def get_test_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--model_name', type=str, default='best', help = 'optimizer used for training')
+    parser.add_argument('--model_name', type=str, default='best', help = 'model name to be tested')
     
     return parser.parse_args()

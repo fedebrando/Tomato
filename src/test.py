@@ -6,13 +6,14 @@ from torchvision import transforms
 from tqdm import tqdm
 from PIL import Image
 import matplotlib.pyplot as plt
-from torch.utils.tensorboard import SummaryWriter  # Importa TensorBoard SummaryWriter
+from torch.utils.tensorboard import SummaryWriter 
 
 from model import UNET
 from dataset import TomatoDataset
 from metrics import acc_metric
 from params import CLASS_TO_COLOR
-from sklearn.metrics import confusion_matrix  # Importa la funzione confusion_matrix
+from sklearn.metrics import confusion_matrix  
+from arg_parser import get_test_args
 
 NUM_CLASSES = 6
 
@@ -169,18 +170,17 @@ def save_metrics_to_markdown(metrics, filename="metrics.md"):
 
     print(f"✅ Metrics saved to {filename}")
 
-def main():
+def main(args):
     # === CONFIGURATION ===
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_path = os.path.join('..', 'models', 'best_model.pth')
+    model_path = os.path.join('..', 'models', args.model_name, 'best_model.pth')
     data_root = os.path.join('..', 'images')
     batch_size = 4
     save_preds = True
     save_rgb_preds = True
 
     # === CREATE A NEW DIRECTORY FOR TENSORBOARD LOGS ===
-    model_name = os.path.splitext(os.path.basename(model_path))[0]  # Extract model file name
-    log_dir = os.path.join("..", "runs", model_name)  # Create a directory based on the model name
+    log_dir = os.path.join("..", "runs", args.model_name, "test")  # Create a directory based on the model name
     writer = SummaryWriter(log_dir)  # Initialize TensorBoard writer
 
     # === LOAD MODEL ===
@@ -296,4 +296,5 @@ def main():
         print("✅ Visual samples saved to ../predictions/")
 
 if __name__ == "__main__":
-    main()
+    args = get_test_args() 
+    main(args)

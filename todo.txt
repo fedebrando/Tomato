@@ -4,3 +4,4 @@
 
 *** salvare su tensorboard prima del train i parametri di addestramento e i risutlati del train
 
+*** riguardare tensorboard soprattutto le metriche scalar
