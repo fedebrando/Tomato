@@ -11,16 +11,17 @@ from metrics import acc_metric
 from model import UNET
 from dataset import TomatoDataset
 from params import VAL_PCT
+from arg_parser import get_train_args
 
-def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, epochs=1, early_stopping_patience=200):
+def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, args, model_name, epochs=1):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     start = time.time()
-    model.cuda()
-
+    model.to(device)
     train_loss, valid_loss = [], []
     best_val_acc = 0.0
     epochs_no_improve = 0
 
-    MODEL_DIR = '../models'
+    MODEL_DIR = '../models/' + model_name
     os.makedirs(MODEL_DIR, exist_ok=True)
 
     for epoch in range(epochs):
@@ -36,8 +37,8 @@ def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, epochs=
 
             # ✅ Aggiunta di tqdm
             for step, (x, y) in enumerate(tqdm(dataloader, desc=f"{phase.capitalize()} Epoch {epoch}")):
-                x = x.cuda()
-                y = y.cuda()
+                x = x.to(device)
+                y = y.to(device)
 
                 if phase == 'train':
                     optimizer.zero_grad()
@@ -57,7 +58,8 @@ def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, epochs=
             epoch_loss = running_loss / len(dataloader)
             epoch_acc = running_acc / len(dataloader)
 
-            print(f"{phase.capitalize()} Loss: {epoch_loss:.4f} | Acc: {epoch_acc:.4f}")
+            if (epoch + 1) % args.print_every == 0:
+                print(f"{phase.capitalize()} Loss: {epoch_loss:.4f} | Acc: {epoch_acc:.4f}")
 
             writer.add_scalar(f'{phase}/loss', epoch_loss, epoch)
             writer.add_scalar(f'{phase}/accuracy', epoch_acc, epoch)
@@ -76,8 +78,8 @@ def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, epochs=
                     epochs_no_improve += 1
                     print(f"⚠️ No improvement in validation accuracy for {epochs_no_improve} epoch(s)")
 
-        if epochs_no_improve > early_stopping_patience:
-            print(f"⏹️ Early stopping triggered after {epoch + 1} epochs (no improvement in {early_stopping_patience} epochs).")
+        if epochs_no_improve > args.early_stop:
+            print(f"⏹️ Early stopping triggered after {epoch + 1} epochs (no improvement in {args.early_stop} epochs).")
             break
 
     print("💾 Saving LAST model after final epoch")
@@ -88,10 +90,10 @@ def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, epochs=
 
     return train_loss, valid_loss
 
-def main():
+def main(args):
     unet = UNET(3, 6)
     loss = nn.CrossEntropyLoss()
-    opt = torch.optim.Adam(unet.parameters(), lr=0.01)
+    opt = torch.optim.Adam(unet.parameters(), lr=args.lr)
 
     transform = transforms.Compose([
         transforms.ToTensor()
@@ -105,15 +107,18 @@ def main():
 
     train_dataset, val_dataset = random_split(train_data, [train_len, val_len])
 
-    train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=4, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.bs, shuffle=False)
 
-    writer = SummaryWriter(log_dir='../runs/tomato_segmentation_experiment')
+    model_name = f"{args.opt}_lr{args.lr:.0e}_bs{args.bs}_es{args.early_stop}"
 
-    train_loss, valid_loss = train(unet, train_loader, val_loader, loss, opt, acc_metric, writer, epochs=100)
+    writer = SummaryWriter(log_dir='../runs/' + model_name)
+
+    train_loss, valid_loss = train(unet, train_loader, val_loader, loss, opt, acc_metric, writer, args, model_name, epochs=args.epochs)
 
     writer.close()
 
 
 if __name__ == '__main__':
-    main()
+    args = get_train_args()
+    main(args)

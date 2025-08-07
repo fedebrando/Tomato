@@ -1,7 +1,6 @@
 
-[1. Rendere tutto deterministico (seed)]
+*** Aggiungere i parametri settati su tensorboard (sarebbe carino un file .py a parte con i parametri e main)
+-> mettere a posto possibilità di scegliere Adam o SGD
 
-4. Metriche per la segmentazione (file .py con metriche e basta)
-
-5. Aggiungere i parametri settati su tensorboard (sarebbe carino un file .py a parte con i parametri e main)
+*** salvare su tensorboard prima del train i parametri di addestramento e i risutlati del train
 

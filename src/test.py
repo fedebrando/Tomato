@@ -6,11 +6,13 @@ from torchvision import transforms
 from tqdm import tqdm
 from PIL import Image
 import matplotlib.pyplot as plt
+from torch.utils.tensorboard import SummaryWriter  # Importa TensorBoard SummaryWriter
 
 from model import UNET
 from dataset import TomatoDataset
 from metrics import acc_metric
 from params import CLASS_TO_COLOR
+from sklearn.metrics import confusion_matrix  # Importa la funzione confusion_matrix
 
 NUM_CLASSES = 6
 
@@ -84,18 +86,107 @@ def plot_sample_grid(x, pred_mask, target_mask, idx, save_dir="../predictions"):
     plt.savefig(os.path.join(save_dir, f"sample_{idx}.png"))
     plt.close()
 
+# Funzione per calcolare le metriche
+def calculate_metrics(pred_mask, true_mask, num_classes=NUM_CLASSES):
+    """Calcola le metriche di segmentazione: IoU, Precision, Recall, F1, Dice"""
+    
+    # Flatten le maschere per confrontare tutti i pixel
+    pred_flat = pred_mask.flatten()
+    true_flat = true_mask.flatten()
+
+    # Calcola la matrice di confusione
+    cm = confusion_matrix(true_flat, pred_flat, labels=np.arange(num_classes))
+
+    # Calcolare le metriche per ogni classe
+    iou_list = []
+    precision_list = []
+    recall_list = []
+    f1_list = []
+    dice_list = []
+    accuracy = torch.sum(pred_flat == true_flat) / len(true_flat)  # Accuracy globale
+
+    for i in range(num_classes):
+        TP = cm[i, i]
+        FP = np.sum(cm[:, i]) - TP
+        FN = np.sum(cm[i, :]) - TP
+        TN = np.sum(cm) - TP - FP - FN
+        
+        # IoU
+        iou = TP / (TP + FP + FN) if (TP + FP + FN) != 0 else 0
+        iou_list.append(iou)
+        
+        # Precision
+        precision = TP / (TP + FP) if (TP + FP) != 0 else 0
+        precision_list.append(precision)
+        
+        # Recall
+        recall = TP / (TP + FN) if (TP + FN) != 0 else 0
+        recall_list.append(recall)
+        
+        # F1-score
+        f1 = (2 * precision * recall) / (precision + recall) if (precision + recall) != 0 else 0
+        f1_list.append(f1)
+        
+        # Dice coefficient
+        dice = (2 * TP) / (2 * TP + FP + FN) if (2 * TP + FP + FN) != 0 else 0
+        dice_list.append(dice)
+    
+    # Media delle metriche per ogni classe
+    mean_iou = np.mean(iou_list)
+    mean_precision = np.mean(precision_list)
+    mean_recall = np.mean(recall_list)
+    mean_f1 = np.mean(f1_list)
+    mean_dice = np.mean(dice_list)
+    
+    return {
+        "accuracy": accuracy,
+        "mean_iou": mean_iou,
+        "mean_precision": mean_precision,
+        "mean_recall": mean_recall,
+        "mean_f1": mean_f1,
+        "mean_dice": mean_dice,
+        "iou_per_class": iou_list,
+        "precision_per_class": precision_list,
+        "recall_per_class": recall_list,
+        "f1_per_class": f1_list,
+        "dice_per_class": dice_list
+    }
+
+def save_metrics_to_markdown(metrics, filename="metrics.md"):
+    """Salva le metriche in un file markdown come tabella"""
+    
+    with open(filename, "w") as f:
+        # Scrivi l'intestazione della tabella
+        f.write("# Metrics Table\n\n")
+        f.write("| Metric | Value |\n")
+        f.write("|--------|-------|\n")
+        
+        # Scrivi le metriche nella tabella
+        for metric, value in metrics.items():
+            if isinstance(value, list):  # Per le metriche per classe, scrivile come una lista
+                value = ", ".join([f"{v:.4f}" for v in value])
+            f.write(f"| {metric} | {value} |\n")
+
+    print(f"✅ Metrics saved to {filename}")
 
 def main():
     # === CONFIGURATION ===
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_path = os.path.join('..', 'models', 'best_model.pth')
     data_root = os.path.join('..', 'images')
     batch_size = 4
     save_preds = True
+    save_rgb_preds = True
+
+    # === CREATE A NEW DIRECTORY FOR TENSORBOARD LOGS ===
+    model_name = os.path.splitext(os.path.basename(model_path))[0]  # Extract model file name
+    log_dir = os.path.join("..", "runs", model_name)  # Create a directory based on the model name
+    writer = SummaryWriter(log_dir)  # Initialize TensorBoard writer
 
     # === LOAD MODEL ===
     model = UNET(3, NUM_CLASSES)
     model.load_state_dict(torch.load(model_path))
-    model.eval().cuda()
+    model.eval().to(device)
 
     # === DATASET ===
     transform = transforms.Compose([transforms.ToTensor()])
@@ -104,27 +195,104 @@ def main():
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 
     # === EVALUATION ===
-    total_acc = 0.0
+    total_metrics = {
+        "accuracy": 0.0,
+        "mean_iou": 0.0,
+        "mean_precision": 0.0,
+        "mean_recall": 0.0,
+        "mean_f1": 0.0,
+        "mean_dice": 0.0
+    }
+    
     with torch.no_grad():
         for x, y in tqdm(test_loader, desc="Evaluating"):
-            x = x.cuda()
-            y = y.cuda()
+            x = x.to(device)
+            y = y.to(device)
             preds = model(x)
-            acc = acc_metric(preds, y)
-            total_acc += acc.item()
+            pred_mask = preds.argmax(dim=1)  # Assicurati che la previsione abbia la forma giusta
 
-    avg_acc = total_acc / len(test_loader)
-    print(f"\n✅ Accuracy on test set: {avg_acc:.4f}")
+            # Calcola le metriche per la segmentazione
+            metrics = calculate_metrics(pred_mask.cpu(), y.cpu())  # Passa le maschere sulla CPU per calcolare le metriche
+
+            for key in total_metrics:
+                total_metrics[key] += metrics[key]
+
+            i = 0
+            # Log metrics to TensorBoard for each batch
+            writer.add_scalar("Accuracy", total_metrics["accuracy"] / (len(test_loader)), global_step=i)
+            writer.add_scalar("Mean IoU", total_metrics["mean_iou"] / (len(test_loader)), global_step=i)
+            writer.add_scalar("Mean Precision", total_metrics["mean_precision"] / (len(test_loader)), global_step=i)
+            writer.add_scalar("Mean Recall", total_metrics["mean_recall"] / (len(test_loader)), global_step=i)
+            writer.add_scalar("Mean F1", total_metrics["mean_f1"] / (len(test_loader)), global_step=i)
+            writer.add_scalar("Mean Dice", total_metrics["mean_dice"] / (len(test_loader)), global_step=i)
+
+    # Final metrics
+    num_batches = len(test_loader)
+    for key in total_metrics:
+        total_metrics[key] /= num_batches
+
+    print(f"\n✅ Accuracy: {total_metrics['accuracy']:.4f}")
+    print(f"✅ Mean IoU: {total_metrics['mean_iou']:.4f}")
+    print(f"✅ Mean Precision: {total_metrics['mean_precision']:.4f}")
+    print(f"✅ Mean Recall: {total_metrics['mean_recall']:.4f}")
+    print(f"✅ Mean F1: {total_metrics['mean_f1']:.4f}")
+    print(f"✅ Mean Dice: {total_metrics['mean_dice']:.4f}")
+    
+    # === Save Metrics as Markdown ===
+    #save_metrics_to_markdown(total_metrics, filename="metrics.md")
+    
+    # Costruisci tabella markdown come stringa
+    # === Tabella Markdown per TensorBoard con medie e per-classe ===
+    CLASS_NAMES = ["Background", "Tomato", "Leaves", "Vase", "Floor", "Trunk"]  # oppure importala da params.py
+
+    # === Tabella 1: Metriche medie ===
+    mean_metrics_table = "| Metric | Value |\n|--------|-------|\n"
+    for key in ["accuracy", "mean_iou", "mean_precision", "mean_recall", "mean_f1", "mean_dice"]:
+        mean_metrics_table += f"| {key} | {metrics[key]:.4f} |\n"
+
+    # === Tabella 2: Metriche per classe ===
+    per_class_table = "| Class | IoU | Precision | Recall | F1 | Dice |\n"
+    per_class_table += "|-------|-----|-----------|--------|----|------|\n"
+    for i, class_name in enumerate(CLASS_NAMES):
+        per_class_table += (
+            f"| {class_name} | "
+            f"{metrics['iou_per_class'][i]:.4f} | "
+            f"{metrics['precision_per_class'][i]:.4f} | "
+            f"{metrics['recall_per_class'][i]:.4f} | "
+            f"{metrics['f1_per_class'][i]:.4f} | "
+            f"{metrics['dice_per_class'][i]:.4f} |\n"
+        )
+
+    # === Logga le tabelle su TensorBoard ===
+    writer.add_text("Metrics/Mean", mean_metrics_table, global_step=0)
+    writer.add_text("Metrics/Per Class", per_class_table, global_step=0)
+
+
+
 
     # === SAVE VISUALIZATION ===
     if save_preds:
         model.cpu()
         print("📸 Saving visual samples...")
+
         for i in range(5):
             x, y = test_set[i]
             pred = model(x.unsqueeze(0)).squeeze(0)
             pred_mask = pred.argmax(dim=0).byte()
+
+            # Salva la predizione originale (maschera)
+            if save_preds:
+                pred_mask_img = Image.fromarray(pred_mask.cpu().numpy())  # Converti la maschera in immagine
+                pred_mask_img.save(os.path.join('../predictions', f"pred_mask_{i}.png"))
+
+            # Salva la predizione in RGB
+            if save_rgb_preds:
+                pred_rgb = decode_segmentation_mask(pred_mask.cpu().numpy())  # Converti la maschera in RGB
+                pred_rgb.save(os.path.join('../predictions', f"pred_rgb_{i}.png"))
+
+            # Salva anche la visualizzazione della griglia (originale + overlay)
             plot_sample_grid(x, pred_mask, y, idx=i)
+
         print("✅ Visual samples saved to ../predictions/")
 
 if __name__ == "__main__":
