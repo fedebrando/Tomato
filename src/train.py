@@ -15,6 +15,7 @@ from arg_parser import get_train_args
 
 def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, args, model_name, epochs=1):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(device)
     start = time.time()
     model.to(device)
     train_loss, valid_loss = [], []

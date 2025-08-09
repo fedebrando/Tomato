@@ -1,5 +1,4 @@
 
-
 import argparse
 
 def get_train_args():
@@ -11,7 +10,7 @@ def get_train_args():
     parser.add_argument('--early_stop', type=int, default=5, help='number of non improvements on validation accuracy')
 
     parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
-    parser.add_argument('--opt', type=str, default='SGD', choices=['SGD', 'Adam'], help = 'optimizer used for training')
+    parser.add_argument('--opt', type=str, default='Adam', choices=['SGD', 'Adam'], help = 'optimizer used for training')
     
     return parser.parse_args()
 

@@ -153,23 +153,6 @@ def calculate_metrics(pred_mask, true_mask, num_classes=NUM_CLASSES):
         "dice_per_class": dice_list
     }
 
-def save_metrics_to_markdown(metrics, filename="metrics.md"):
-    """Salva le metriche in un file markdown come tabella"""
-    
-    with open(filename, "w") as f:
-        # Scrivi l'intestazione della tabella
-        f.write("# Metrics Table\n\n")
-        f.write("| Metric | Value |\n")
-        f.write("|--------|-------|\n")
-        
-        # Scrivi le metriche nella tabella
-        for metric, value in metrics.items():
-            if isinstance(value, list):  # Per le metriche per classe, scrivile come una lista
-                value = ", ".join([f"{v:.4f}" for v in value])
-            f.write(f"| {metric} | {value} |\n")
-
-    print(f"✅ Metrics saved to {filename}")
-
 def main(args):
     # === CONFIGURATION ===
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -217,15 +200,6 @@ def main(args):
             for key in total_metrics:
                 total_metrics[key] += metrics[key]
 
-            i = 0
-            # Log metrics to TensorBoard for each batch
-            writer.add_scalar("Accuracy", total_metrics["accuracy"] / (len(test_loader)), global_step=i)
-            writer.add_scalar("Mean IoU", total_metrics["mean_iou"] / (len(test_loader)), global_step=i)
-            writer.add_scalar("Mean Precision", total_metrics["mean_precision"] / (len(test_loader)), global_step=i)
-            writer.add_scalar("Mean Recall", total_metrics["mean_recall"] / (len(test_loader)), global_step=i)
-            writer.add_scalar("Mean F1", total_metrics["mean_f1"] / (len(test_loader)), global_step=i)
-            writer.add_scalar("Mean Dice", total_metrics["mean_dice"] / (len(test_loader)), global_step=i)
-
     # Final metrics
     num_batches = len(test_loader)
     for key in total_metrics:
@@ -237,9 +211,6 @@ def main(args):
     print(f"✅ Mean Recall: {total_metrics['mean_recall']:.4f}")
     print(f"✅ Mean F1: {total_metrics['mean_f1']:.4f}")
     print(f"✅ Mean Dice: {total_metrics['mean_dice']:.4f}")
-    
-    # === Save Metrics as Markdown ===
-    #save_metrics_to_markdown(total_metrics, filename="metrics.md")
     
     # Costruisci tabella markdown come stringa
     # === Tabella Markdown per TensorBoard con medie e per-classe ===
@@ -266,9 +237,6 @@ def main(args):
     # === Logga le tabelle su TensorBoard ===
     writer.add_text("Metrics/Mean", mean_metrics_table, global_step=0)
     writer.add_text("Metrics/Per Class", per_class_table, global_step=0)
-
-
-
 
     # === SAVE VISUALIZATION ===
     if save_preds:
