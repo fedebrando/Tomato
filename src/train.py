@@ -94,7 +94,7 @@ def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, args, m
 def main(args):
     unet = UNET(3, 6)
     loss = nn.CrossEntropyLoss()
-    opt = torch.optim.Adam(unet.parameters(), lr=args.lr)
+    opt = torch.optim.Adam(unet.parameters(), lr=args.lr) if args.opt == 'Adam' else torch.optim.SGD(unet.parameters(), lr=args.lr)
 
     transform = transforms.Compose([
         transforms.ToTensor()
@@ -114,6 +114,12 @@ def main(args):
     model_name = f"{args.opt}_lr{args.lr:.0e}_bs{args.bs}_es{args.early_stop}"
 
     writer = SummaryWriter(log_dir='../runs/' + model_name + "/train/")
+
+    args_table = "| Nome parametro | Valore |\n|---|---|\n"
+    for k, v in vars(args).items():
+        args_table += f"| {k} | {v} |\n"
+    writer.add_text("Hyperparameters", args_table, 0)
+    print('Fatto!')
 
     train_loss, valid_loss = train(unet, train_loader, val_loader, loss, opt, acc_metric, writer, args, model_name, epochs=args.epochs)
 
