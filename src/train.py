@@ -87,9 +87,9 @@ def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, args, m
     torch.save(model.state_dict(), os.path.join(MODEL_DIR, 'last_model.pth'))
 
     time_elapsed = time.time() - start
-    print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+    print('Training complete in {:.0f}h {:.0f}m {:.0f}s'.format(time_elapsed // 3600, (time_elapsed % 3600) // 60, time_elapsed % 60))
 
-    return train_loss, valid_loss
+    return train_loss, valid_loss, time_elapsed
 
 def main(args):
     unet = UNET(3, 6)
@@ -119,9 +119,11 @@ def main(args):
     for k, v in vars(args).items():
         args_table += f"| {k} | {v} |\n"
     writer.add_text("Hyperparameters", args_table, 0)
-    print('Fatto!')
 
-    train_loss, valid_loss = train(unet, train_loader, val_loader, loss, opt, acc_metric, writer, args, model_name, epochs=args.epochs)
+    _, _, time_elapsed = train(unet, train_loader, val_loader, loss, opt, acc_metric, writer, args, model_name, epochs=args.epochs)
+    args_table = "| Training time |\n|---|\n"
+    args_table += f"| {'{:.0f}h {:.0f}m {:.0f}s'.format(time_elapsed // 3600, (time_elapsed % 3600) // 60, time_elapsed % 60)} |\n"
+    writer.add_text("Training time", args_table, 0)
 
     writer.close()
 
