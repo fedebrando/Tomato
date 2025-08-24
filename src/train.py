@@ -2,7 +2,7 @@ import os
 import time
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -12,6 +12,9 @@ from model import UNET
 from dataset import TomatoDataset
 from params import VAL_PCT
 from arg_parser import get_train_args
+
+SEED_FOR_VAL_SET_REPRODUCIBILITY = 42
+AUGM = True # TODO convert into input param
 
 def train(model, train_dl, valid_dl, loss_fn, optimizer, acc_fn, writer, args, model_name, epochs=1):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -96,28 +99,44 @@ def main(args):
     loss = nn.CrossEntropyLoss()
     opt = torch.optim.Adam(unet.parameters(), lr=args.lr) if args.opt == 'Adam' else torch.optim.SGD(unet.parameters(), lr=args.lr)
 
-    transform = transforms.Compose([
-        transforms.ToTensor()
-    ])
-
-    train_data = TomatoDataset(os.path.join('..', 'images'), transform=transform, target_transform=transform, mode='train')
+    train_data = TomatoDataset(os.path.join('images'), flip_prob=args.aug_flip, rotate_prob=args.aug_rotate, jitter_prob=args.aug_jitter, crop_prob=args.aug_crop, mode='train')
     train_data_len = len(train_data)
 
     val_len = int(train_data_len * VAL_PCT)
     train_len = train_data_len - val_len
 
-    train_dataset, val_dataset = random_split(train_data, [train_len, val_len])
+    train_indices, val_indices = random_split(
+      range(train_data_len),
+      [train_len, val_len],
+      generator = torch.Generator().manual_seed(SEED_FOR_VAL_SET_REPRODUCIBILITY)
+    )
+    
+    # Training set
+    train_dataset = Subset(train_data, train_indices)
+    
+    # Validation set
+    train_data_no_augm = TomatoDataset(os.path.join('images'), mode='train')
+    val_dataset = Subset(train_data_no_augm, val_indices)
 
     train_loader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=args.bs, shuffle=False)
-
-    model_name = f"{args.opt}_lr{args.lr:.0e}_bs{args.bs}_es{args.early_stop}"
+    
+    if args.refine_model:
+      unet.load_state_dict(torch.load(args.refine_model, map_location='cuda' if torch.cuda.is_available() else 'cpu', weights_only=True))
+    
+    model_name = f"{args.opt}_lr{args.lr:.0e}_bs{args.bs}_es{args.early_stop}" \
+                  + (f'_flip{args.aug_flip}' if args.aug_flip else '') \
+                  + (f'_rotate{args.aug_rotate}' if args.aug_rotate else '') \
+                  + (f'_jitter{args.aug_jitter}' if args.aug_jitter else '') \
+                  + (f'_crop{args.aug_crop}' if args.aug_crop else '') \
+                  + (f'_refined' if args.refine_model else '')
+                  
 
     writer = SummaryWriter(log_dir='../runs/' + model_name + "/train/")
 
     args_table = "| Nome parametro | Valore |\n|---|---|\n"
     for k, v in vars(args).items():
-        args_table += f"| {k} | {v} |\n"
+        args_table += f"| {k} | {v if bool(v) else 'None'} |\n"
     writer.add_text("Hyperparameters", args_table, 0)
 
     _, _, time_elapsed = train(unet, train_loader, val_loader, loss, opt, acc_metric, writer, args, model_name, epochs=args.epochs)
