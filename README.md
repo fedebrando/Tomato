@@ -40,15 +40,17 @@ The entry point of training is in the script `/src/train.py`. To run a train, op
 
 Now, you can start training running the command below from `/`.
 ```bash
-    sbatch hpc_launch.bash
+sbatch hpc_launch.bash
 ```
 
 ## Testing
-For a model testing, the entry point is in the script `/src/test.py`. To test your model on the test set, you can run the following command from `/`, where `--model_name` must be set with your model name.
+For a model testing, the entry point is in the script `/src/test.py`. To test your model on the test set, you can run the following command from `/`, where `--model_name` must be set with your model name and `--save_preds` is useful to see some model predictions.
 ```bash
-    python ./src/test.py --model_name=best
+python ./src/test.py --model_name=best_model_name --save_preds
 ```
 
 ## Notes
 To change percentages for the validation set or the test set, modify their relative constants in the script `/src/params.py`.
+
+The **best-so-far model** is saved with its relative statistic information in `/best_model`.
 
