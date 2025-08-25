@@ -1,3 +1,4 @@
+
 import os
 import torch
 import numpy as np
@@ -40,7 +41,7 @@ def create_overlay(input_tensor, mask_tensor):
     return Image.alpha_composite(base, mask_overlay)
 
 
-def plot_sample_grid(x, pred_mask, target_mask, idx, save_dir="../predictions"):
+def plot_sample_grid(x, pred_mask, target_mask, idx, save_dir):
     """
     Save a 3-row, 2-column figure:
         Row 1: Input only
@@ -157,10 +158,8 @@ def main(args):
     # === CONFIGURATION ===
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_path = os.path.join('..', 'models', args.model_name, 'best_model.pth')
-    data_root = os.path.join('..', 'images')
+    data_root = 'images'
     batch_size = 4
-    save_preds = True
-    save_rgb_preds = True
 
     # === CREATE A NEW DIRECTORY FOR TENSORBOARD LOGS ===
     log_dir = os.path.join("..", "runs", args.model_name, "test")  # Create a directory based on the model name
@@ -168,12 +167,12 @@ def main(args):
 
     # === LOAD MODEL ===
     model = UNET(3, NUM_CLASSES)
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path, weights_only=True))
     model.eval().to(device)
 
     # === DATASET ===
     transform = transforms.Compose([transforms.ToTensor()])
-    test_set = TomatoDataset(data_root, transform=transform, target_transform=None, mode='test')
+    test_set = TomatoDataset(data_root, mode='test')
 
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 
@@ -239,9 +238,12 @@ def main(args):
     writer.add_text("Metrics/Per Class", per_class_table, global_step=0)
 
     # === SAVE VISUALIZATION ===
-    if save_preds:
+    if args.save_preds:
         model.cpu()
         print("📸 Saving visual samples...")
+        
+        save_dir = os.path.join("..", "runs", args.model_name, "inference")
+        os.makedirs(save_dir, exist_ok=True)
 
         for i in range(5):
             x, y = test_set[i]
@@ -249,19 +251,16 @@ def main(args):
             pred_mask = pred.argmax(dim=0).byte()
 
             # Salva la predizione originale (maschera)
-            if save_preds:
-                pred_mask_img = Image.fromarray(pred_mask.cpu().numpy())  # Converti la maschera in immagine
-                pred_mask_img.save(os.path.join('../predictions', f"pred_mask_{i}.png"))
+            pred_mask_img = Image.fromarray(pred_mask.cpu().numpy())  # Converti la maschera in immagine
+            pred_mask_img.save(os.path.join(save_dir, f"pred_mask_{i}.png"))
 
-            # Salva la predizione in RGB
-            if save_rgb_preds:
-                pred_rgb = decode_segmentation_mask(pred_mask.cpu().numpy())  # Converti la maschera in RGB
-                pred_rgb.save(os.path.join('../predictions', f"pred_rgb_{i}.png"))
+            pred_rgb = decode_segmentation_mask(pred_mask.cpu().numpy())  # Converti la maschera in RGB
+            pred_rgb.save(os.path.join(save_dir, f"pred_rgb_{i}.png"))
 
             # Salva anche la visualizzazione della griglia (originale + overlay)
-            plot_sample_grid(x, pred_mask, y, idx=i)
+            plot_sample_grid(x, pred_mask, y, idx=i, save_dir=save_dir)
 
-        print("✅ Visual samples saved to ../predictions/")
+        print(f"✅ Visual samples saved to {save_dir}")
 
 if __name__ == "__main__":
     args = get_test_args() 

@@ -31,6 +31,7 @@ def get_train_args():
 def get_test_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--model_name', type=str, default='best', help='model name to be tested')
+    parser.add_argument('--model_name', type=str, default='best', help='name of the model to be tested')
+    parser.add_argument('--save_preds', action='store_true', help='save some model predictions')
     
     return parser.parse_args()
