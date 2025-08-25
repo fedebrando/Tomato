@@ -52,5 +52,7 @@ python ./src/test.py --model_name=best_model_name --save_preds
 ## Notes
 To change percentages for the validation set or the test set, modify their relative constants in the script `/src/params.py`.
 
-The **best-so-far model** is saved with its relative statistic information in `/best_model`.
-
+The **best-so-far model** is saved with its relative statistic information in `/best_model`. You can show the latter ruunning the command below from `/`.
+```bash
+tensorboard --logdir=best_model/stats
+```
